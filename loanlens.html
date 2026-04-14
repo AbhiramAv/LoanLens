@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LoanLens — Live Education Loan Rates</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#060C1A;--s1:#0C1525;--s2:#111E35;--s3:#172440;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --acc:#17D9A0;--acc2:rgba(23,217,160,0.12);--acc3:rgba(23,217,160,0.25);
+  --amb:#F59E0B;--amb2:rgba(245,158,11,0.12);
+  --red:#FF6060;--red2:rgba(255,96,96,0.12);
+  --blu:#4D9FFF;--blu2:rgba(77,159,255,0.12);
+  --pur:#9B7FFF;--pur2:rgba(155,127,255,0.12);
+  --txt:#DDE8FF;--txt2:#8A9DC0;--txt3:#4A5B7A;
+  --mono:'JetBrains Mono',monospace;--disp:'Syne',sans-serif;--body:'DM Sans',sans-serif;
+  --r4:4px;--r8:8px;--r12:12px;--r16:16px;--r20:20px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--txt);font-family:var(--body);font-size:14px;line-height:1.6;min-height:100vh;overflow-x:hidden;}
+
+/* GRID TEXTURE */
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(rgba(23,217,160,0.018) 1px,transparent 1px),linear-gradient(90deg,rgba(23,217,160,0.018) 1px,transparent 1px);
+  background-size:48px 48px;}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--s3);border-radius:2px;}
+::-webkit-scrollbar-thumb:hover{background:var(--txt3);}
+
+/* ═══════ HEADER ═══════ */
+.hdr{position:sticky;top:0;z-index:100;background:rgba(6,12,26,0.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:0 24px;}
+.hdr-inner{max-width:1160px;margin:0 auto;display:flex;align-items:center;gap:16px;height:56px;}
+.logo{display:flex;align-items:center;gap:9px;text-decoration:none;flex-shrink:0;}
+.logo-mark{width:32px;height:32px;border-radius:8px;background:var(--acc);display:grid;place-items:center;}
+.logo-mark svg{width:16px;height:16px;}
+.logo-txt{font-family:var(--disp);font-size:17px;font-weight:800;letter-spacing:-0.3px;color:var(--txt);}
+.logo-txt em{color:var(--acc);font-style:normal;}
+.hdr-gap{flex:1;}
+.sync-pill{display:flex;align-items:center;gap:7px;padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--s1);font-size:11px;font-weight:500;cursor:pointer;transition:all .2s;white-space:nowrap;font-family:var(--body);}
+.sync-pill:hover{border-color:var(--acc3);background:var(--acc2);}
+.sync-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.sync-dot.live{background:var(--acc);box-shadow:0 0 0 3px rgba(23,217,160,0.25);animation:pulse 2s infinite;}
+.sync-dot.syncing{background:var(--amb);animation:spin-dot 1s linear infinite;}
+.sync-dot.fallback{background:var(--amb);}
+.sync-dot.err{background:var(--red);}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(23,217,160,0.25);}50%{box-shadow:0 0 0 6px rgba(23,217,160,0.08);}}
+@keyframes spin-dot{0%{opacity:1;}50%{opacity:0.3;}100%{opacity:1;}}
+.sync-txt{color:var(--txt2);}
+.sync-txt strong{color:var(--txt);}
+.hdr-badge{font-size:10px;padding:3px 10px;border-radius:20px;background:var(--amb2);color:var(--amb);border:1px solid rgba(245,158,11,0.22);font-weight:600;letter-spacing:0.03em;white-space:nowrap;}
+
+/* ═══════ BANK STRIP ═══════ */
+.bank-strip-wrap{background:var(--s1);border-bottom:1px solid var(--border);position:sticky;top:56px;z-index:90;}
+.bank-strip{max-width:1160px;margin:0 auto;padding:10px 24px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;}
+.bank-strip::-webkit-scrollbar{display:none;}
+.bchip{display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:var(--r8);border:1px solid var(--border);background:var(--s2);cursor:pointer;transition:all .15s;flex-shrink:0;white-space:nowrap;}
+.bchip:hover{border-color:var(--border2);background:var(--s3);}
+.bchip.sel{border-color:var(--acc);background:var(--acc2);}
+.bchip-type{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:0.04em;}
+.ct-psu{background:rgba(23,217,160,0.15);color:var(--acc);}
+.ct-pvt{background:var(--blu2);color:var(--blu);}
+.ct-nbc{background:var(--pur2);color:var(--pur);}
+.bchip-name{font-size:12px;font-weight:500;}
+.bchip-rate{font-family:var(--mono);font-size:11px;color:var(--txt2);}
+.bchip-rate strong{color:var(--acc);font-weight:600;}
+.bchip-live{width:5px;height:5px;border-radius:50%;background:var(--acc);flex-shrink:0;}
+.bchip-live.stale{background:var(--txt3);}
+
+/* ═══════ MAIN LAYOUT ═══════ */
+.main{max-width:1160px;margin:0 auto;padding:24px 24px 60px;display:grid;grid-template-columns:360px 1fr;gap:22px;align-items:start;}
+@media(max-width:900px){.main{grid-template-columns:1fr;padding:16px 16px 60px;}}
+
+/* ═══════ LEFT PANEL — CONFIGURATOR ═══════ */
+.config-panel{position:sticky;top:calc(56px + 57px + 16px);display:flex;flex-direction:column;gap:12px;}
+@media(max-width:900px){.config-panel{position:static;}}
+
+.bank-info-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r12);padding:14px 16px;}
+.binfo-top{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.binfo-icon{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;font-size:14px;flex-shrink:0;}
+.binfo-name{font-family:var(--disp);font-size:14px;font-weight:700;}
+.binfo-sub{font-size:11px;color:var(--txt2);line-height:1.5;margin-top:2px;}
+.binfo-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px;}
+.bstat{background:var(--s1);border-radius:var(--r8);padding:8px 10px;border:1px solid var(--border);}
+.bstat-lbl{font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;}
+.bstat-val{font-family:var(--mono);font-size:12px;font-weight:600;}
+.bstat-val.acc{color:var(--acc);}
+.bstat-val.amb{color:var(--amb);}
+
+.coll-toggle{display:flex;gap:4px;background:var(--s1);padding:3px;border-radius:var(--r8);border:1px solid var(--border);}
+.ctbtn{flex:1;padding:7px 10px;border:none;border-radius:6px;background:transparent;color:var(--txt2);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;font-family:var(--body);}
+.ctbtn.active{background:var(--s3);color:var(--txt);box-shadow:0 1px 3px rgba(0,0,0,0.3);}
+
+.calc-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r12);padding:16px;}
+.calc-card-title{font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:14px;}
+.field{margin-bottom:16px;}
+.field:last-child{margin-bottom:0;}
+.field-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.field-label{font-size:11px;color:var(--txt2);font-weight:500;}
+.field-value{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--txt);}
+.field-value.editable{background:var(--s1);border:1px solid var(--border);border-radius:4px;padding:2px 8px;outline:none;width:80px;text-align:right;color:var(--acc);}
+.field-value.editable:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc2);}
+.slider-track{position:relative;height:24px;display:flex;align-items:center;}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;background:var(--s3);border-radius:2px;outline:none;border:none;padding:0;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--acc);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 0 3px var(--acc2);transition:box-shadow .15s;}
+input[type=range]::-webkit-slider-thumb:hover{box-shadow:0 0 0 5px var(--acc3);}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--acc);cursor:pointer;border:2px solid var(--bg);}
+.field-hint{font-size:10px;color:var(--txt3);margin-top:4px;}
+.field-select{width:100%;padding:8px 11px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r8);color:var(--txt);font-family:var(--body);font-size:12px;outline:none;-webkit-appearance:none;cursor:pointer;}
+.field-select:focus{border-color:var(--acc);}
+.field-select option{background:var(--s2);}
+
+.emi-display{background:linear-gradient(135deg,var(--s2) 0%,var(--s3) 100%);border:1px solid var(--border);border-radius:var(--r12);padding:18px;position:relative;overflow:hidden;}
+.emi-display::before{content:'';position:absolute;top:-20px;right:-20px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(23,217,160,0.08) 0%,transparent 70%);}
+.emi-label{font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;}
+.emi-num{font-family:var(--mono);font-size:32px;font-weight:600;color:var(--acc);letter-spacing:-1px;line-height:1;margin-bottom:6px;}
+.emi-sub{font-size:11px;color:var(--txt2);}
+.emi-break{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+.emi-tag{font-size:10px;padding:3px 8px;border-radius:4px;font-family:var(--mono);}
+.et-p{background:rgba(23,217,160,0.1);color:var(--acc);}
+.et-i{background:var(--amb2);color:var(--amb);}
+
+/* ═══════ RIGHT PANEL — RESULTS ═══════ */
+.results-panel{display:flex;flex-direction:column;gap:18px;}
+
+.metrics-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+@media(max-width:500px){.metrics-row{grid-template-columns:1fr 1fr;}}
+.metric{background:var(--s2);border:1px solid var(--border);border-radius:var(--r12);padding:14px 16px;}
+.metric.red{border-color:rgba(255,96,96,0.2);background:var(--red2);}
+.metric.amb{border-color:rgba(245,158,11,0.2);background:var(--amb2);}
+.metric.acc{border-color:var(--acc3);background:var(--acc2);}
+.metric.blu{border-color:rgba(77,159,255,0.2);background:var(--blu2);}
+.metric-lbl{font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:5px;}
+.metric-val{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-0.5px;line-height:1.1;}
+.metric.acc .metric-val{color:var(--acc);}
+.metric.amb .metric-val{color:var(--amb);}
+.metric.red .metric-val{color:var(--red);}
+.metric.blu .metric-val{color:var(--blu);}
+.metric-sub{font-size:10px;color:var(--txt2);margin-top:3px;}
+
+/* CHART CARD */
+.chart-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r12);padding:18px;}
+.cc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.cc-title{font-size:11px;font-weight:600;color:var(--txt2);text-transform:uppercase;letter-spacing:0.05em;}
+.cc-legend{display:flex;gap:12px;}
+.cc-leg-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--txt2);}
+.cc-dot{width:7px;height:7px;border-radius:50%;}
+
+/* MORAT TYPE CALLOUT */
+.morat-callout{border-radius:var(--r8);padding:10px 14px;font-size:12px;display:flex;align-items:flex-start;gap:9px;line-height:1.5;}
+.mc-simple{background:rgba(23,217,160,0.07);border:1px solid rgba(23,217,160,0.2);color:var(--acc);}
+.mc-compound{background:rgba(255,96,96,0.07);border:1px solid rgba(255,96,96,0.2);color:var(--red);}
+.mc-icon{font-size:14px;flex-shrink:0;margin-top:1px;}
+
+/* DEEP DIVE TABS */
+.deep-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r12);overflow:hidden;}
+.dtabs{display:flex;border-bottom:1px solid var(--border);background:var(--s1);}
+.dtab{flex:1;padding:11px 8px;font-size:12px;font-weight:500;color:var(--txt2);border:none;background:transparent;cursor:pointer;transition:all .15s;border-bottom:2px solid transparent;font-family:var(--body);display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;}
+.dtab:hover{color:var(--txt);}
+.dtab.active{color:var(--acc);border-bottom-color:var(--acc);background:var(--s2);}
+.dtab-num{width:16px;height:16px;border-radius:50%;font-size:9px;font-weight:700;display:grid;place-items:center;flex-shrink:0;}
+.dtab.active .dtab-num{background:var(--acc);color:var(--bg);}
+.dtab:not(.active) .dtab-num{background:var(--s3);color:var(--txt3);}
+.dpanel{display:none;padding:18px;animation:fadeSlide .2s ease;}
+.dpanel.active{display:block;}
+@keyframes fadeSlide{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+/* TRUE COST TAB */
+.cost-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:600px){.cost-grid{grid-template-columns:1fr;}}
+.toggles-wrap{background:var(--s1);border-radius:var(--r8);border:1px solid var(--border);overflow:hidden;}
+.tog-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);}
+.tog-row:last-child{border-bottom:none;}
+.tog-lbl{font-size:12px;font-weight:500;}
+.tog-sub{font-size:10px;color:var(--txt2);margin-top:1px;}
+.tog{position:relative;width:36px;height:20px;flex-shrink:0;}
+.tog input{opacity:0;width:0;height:0;position:absolute;}
+.ts{position:absolute;inset:0;background:var(--s3);border-radius:10px;cursor:pointer;transition:background .2s;}
+.ts::before{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;left:3px;top:3px;transition:transform .2s;}
+.tog input:checked+.ts{background:var(--acc);}
+.tog input:checked+.ts::before{transform:translateX(16px);}
+.cost-table{width:100%;border-collapse:collapse;}
+.cost-table tr{border-bottom:1px solid rgba(255,255,255,0.04);}
+.cost-table tr:last-child{border-bottom:none;}
+.cost-table td{padding:9px 0;font-size:12px;}
+.cost-table td:last-child{text-align:right;font-family:var(--mono);font-weight:600;font-size:12px;}
+.cost-table .row-total td{border-top:1px solid var(--border);padding-top:12px;color:var(--red);font-size:13px;}
+.cost-table .muted{color:var(--txt2);}
+.rates-compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;}
+.rc-box{background:var(--s1);border:1px solid var(--border);border-radius:var(--r8);padding:10px 12px;}
+.rc-lbl{font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;}
+.rc-val{font-family:var(--mono);font-size:18px;font-weight:600;}
+.ins-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}
+.ins-tag{font-size:11px;padding:4px 10px;border-radius:20px;display:inline-flex;align-items:center;gap:4px;}
+.it-g{background:rgba(23,217,160,0.1);color:var(--acc);border:1px solid rgba(23,217,160,0.2);}
+.it-w{background:var(--amb2);color:var(--amb);border:1px solid rgba(245,158,11,0.2);}
+.it-b{background:var(--red2);color:var(--red);border:1px solid rgba(255,96,96,0.2);}
+
+/* AMORTIZATION TABLE */
+.amort-wrap{max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r8);margin-top:14px;}
+.amort{width:100%;border-collapse:collapse;font-size:11px;}
+.amort th{padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:var(--txt3);border-bottom:1px solid var(--border);background:var(--s1);position:sticky;top:0;font-weight:600;}
+.amort td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.03);}
+.amort tr:hover td{background:rgba(255,255,255,0.02);}
+.ca{color:var(--acc);font-family:var(--mono);}
+.cam{color:var(--amb);font-family:var(--mono);}
+.cmut{color:var(--txt2);font-family:var(--mono);}
+
+/* ROI TAB */
+.tier-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:16px;}
+@media(max-width:600px){.tier-grid{grid-template-columns:repeat(3,1fr);}}
+.tier-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r8);padding:9px 10px;cursor:pointer;transition:all .15s;}
+.tier-card:hover{border-color:var(--border2);}
+.tier-card.sel{border-color:var(--acc);background:var(--acc2);}
+.tier-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;display:inline-block;margin-bottom:5px;}
+.tb1{background:rgba(23,217,160,0.15);color:var(--acc);}
+.tb2{background:var(--blu2);color:var(--blu);}
+.tb3{background:var(--amb2);color:var(--amb);}
+.tb4{background:var(--red2);color:var(--red);}
+.tier-name{font-size:11px;font-weight:500;margin-bottom:2px;}
+.tier-sal{font-size:10px;color:var(--txt2);}
+.roi-inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+@media(max-width:600px){.roi-inputs{grid-template-columns:1fr;}}
+.roi-field label{display:block;font-size:11px;color:var(--txt2);margin-bottom:5px;}
+.roi-field select,.roi-field input{width:100%;padding:8px 10px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r8);color:var(--txt);font-family:var(--body);font-size:12px;outline:none;-webkit-appearance:none;}
+.roi-field select:focus,.roi-field input:focus{border-color:var(--acc);}
+.roi-field select option{background:var(--s2);}
+.be-display{text-align:center;background:var(--s1);border:1px solid var(--border);border-radius:var(--r12);padding:20px;margin-bottom:14px;}
+.be-num{font-family:var(--mono);font-size:56px;font-weight:600;letter-spacing:-2px;background:linear-gradient(135deg,var(--acc),var(--blu));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;margin-bottom:4px;}
+.be-lbl{font-size:12px;color:var(--txt2);}
+.roi-bar-list .roi-bar-row{margin-bottom:12px;}
+.roi-bar-lbl{display:flex;justify-content:space-between;font-size:11px;margin-bottom:5px;}
+.roi-bar-lbl .n{font-weight:500;}
+.roi-bar-lbl .v{color:var(--txt2);}
+.roi-bar-bg{background:var(--s1);border-radius:3px;height:6px;overflow:hidden;}
+.roi-bar-fill{height:100%;border-radius:3px;transition:width .6s ease;}
+.roi-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+@media(max-width:600px){.roi-metrics{grid-template-columns:1fr 1fr;}}
+.rm{background:var(--s1);border:1px solid var(--border);border-radius:var(--r8);padding:10px;}
+.rm-lbl{font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;}
+.rm-val{font-family:var(--mono);font-size:16px;font-weight:600;}
+
+/* COMPARE TAB */
+.cmp-info{font-size:12px;color:var(--acc);background:var(--acc2);border:1px solid rgba(23,217,160,0.2);border-radius:var(--r8);padding:10px 14px;margin-bottom:14px;line-height:1.5;}
+.cmp-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r8);}
+.cmp-t{width:100%;border-collapse:collapse;font-size:11px;min-width:680px;}
+.cmp-t th{padding:10px 11px;text-align:left;font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid var(--border);background:var(--s1);position:sticky;top:0;font-weight:600;white-space:nowrap;}
+.cmp-t td{padding:10px 11px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle;}
+.cmp-t tr:hover td{background:rgba(255,255,255,0.02);}
+.cmp-t tr.best td{background:rgba(23,217,160,0.04);}
+.best-pill{font-size:9px;padding:2px 7px;background:var(--acc2);color:var(--acc);border-radius:20px;font-weight:700;margin-left:6px;}
+.c-hi{color:var(--acc);font-weight:600;font-family:var(--mono);}
+.c-bad{color:var(--red);font-family:var(--mono);}
+.c-mid{color:var(--amb);font-family:var(--mono);}
+.c-def{font-family:var(--mono);}
+.it-pill{font-size:9px;padding:2px 7px;border-radius:4px;font-weight:700;}
+.its{background:rgba(23,217,160,0.12);color:var(--acc);}
+.itc{background:var(--red2);color:var(--red);}
+.cmp-note{font-size:10px;color:var(--txt3);margin-top:10px;}
+
+/* LOADING OVERLAY */
+.load-overlay{position:fixed;inset:0;background:rgba(6,12,26,0.85);backdrop-filter:blur(8px);z-index:999;display:grid;place-items:center;transition:opacity .4s;}
+.load-overlay.hidden{opacity:0;pointer-events:none;}
+.load-box{text-align:center;}
+.load-spinner{width:40px;height:40px;border:2px solid var(--s3);border-top-color:var(--acc);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.load-txt{font-family:var(--disp);font-size:16px;font-weight:700;color:var(--txt);margin-bottom:6px;}
+.load-sub{font-size:12px;color:var(--txt2);}
+.load-step{font-size:11px;color:var(--acc);margin-top:8px;font-family:var(--mono);}
+
+/* MISC */
+.divider{border:none;border-top:1px solid var(--border);margin:14px 0;}
+@media(max-width:900px){.bank-strip-wrap{top:56px;}.config-panel{top:auto;}}
+.changed-badge{font-size:9px;padding:1px 5px;background:rgba(245,158,11,0.15);color:var(--amb);border-radius:3px;margin-left:5px;font-weight:600;}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="load-overlay" id="loadOverlay">
+  <div class="load-box">
+    <div class="load-spinner"></div>
+    <div class="load-txt">Fetching live rates</div>
+    <div class="load-sub">Pulling latest data from all 11 lenders</div>
+    <div class="load-step" id="loadStep">Searching SBI education loan rates...</div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hdr-inner">
+    <div class="logo">
+      <div class="logo-mark"><svg viewBox="0 0 16 16" fill="none"><path d="M1 12L5 7L9 10L13 3L15 5" stroke="#060C1A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15" cy="4" r="2" fill="#060C1A"/></svg></div>
+      <span class="logo-txt">Loan<em>Lens</em></span>
+    </div>
+    <div class="hdr-gap"></div>
+    <button class="sync-pill" id="syncPill" onclick="fetchLiveRates()">
+      <div class="sync-dot syncing" id="syncDot"></div>
+      <span class="sync-txt" id="syncTxt"><strong>Fetching rates…</strong></span>
+    </button>
+    <span class="hdr-badge">STEM India</span>
+  </div>
+</header>
+
+<!-- BANK STRIP -->
+<div class="bank-strip-wrap">
+  <div class="bank-strip" id="bankStrip"></div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT: CONFIGURATOR -->
+  <aside class="config-panel">
+
+    <!-- Bank info card -->
+    <div class="bank-info-card" id="bankInfoCard">
+      <div class="binfo-top">
+        <div class="binfo-icon" id="bankIcon">🏛</div>
+        <div>
+          <div class="binfo-name" id="bankInfoName">State Bank of India</div>
+          <div class="binfo-sub" id="bankInfoSub">Loading…</div>
+        </div>
+      </div>
+      <div class="binfo-stats" id="bankInfoStats"></div>
+    </div>
+
+    <!-- Secured/Unsecured toggle -->
+    <div class="coll-toggle">
+      <button class="ctbtn active" id="btnSec" onclick="setColl('secured')">Secured</button>
+      <button class="ctbtn" id="btnUns" onclick="setColl('unsecured')">Unsecured</button>
+    </div>
+
+    <!-- Sliders -->
+    <div class="calc-card">
+      <div class="calc-card-title">Loan parameters</div>
+
+      <div class="field">
+        <div class="field-header">
+          <span class="field-label">Loan amount</span>
+          <input class="field-value editable" type="number" id="lAmt" oninput="syncIn('lAmt','lS');recalc()">
+        </div>
+        <input type="range" id="lS" min="100000" max="5000000" step="50000" oninput="syncSl('lS','lAmt');recalc()">
+        <div class="field-hint" id="lAmtHint"></div>
+      </div>
+
+      <div class="field">
+        <div class="field-header">
+          <span class="field-label">Interest rate <span id="rateChangedBadge" class="changed-badge" style="display:none">Updated</span></span>
+          <input class="field-value editable" type="number" id="rate" step="0.05" oninput="syncIn('rate','rS');recalc()">
+        </div>
+        <input type="range" id="rS" min="5" max="18" step="0.05" oninput="syncSl('rS','rate');recalc()">
+        <div class="field-hint" id="rHint"></div>
+      </div>
+
+      <div class="field">
+        <div class="field-header">
+          <span class="field-label">Repayment tenure</span>
+          <span class="field-value" id="tenureVal">10 yr</span>
+        </div>
+        <input type="range" id="tS" min="1" max="15" step="1" value="10" oninput="syncSlTen(this);recalc()">
+        <div class="field-hint" id="tenHint"></div>
+      </div>
+
+      <div class="field">
+        <div class="field-header"><span class="field-label">Moratorium period</span></div>
+        <select class="field-select" id="mor" onchange="recalc()">
+          <option value="0">None</option>
+          <option value="12">12 months</option>
+          <option value="24">24 months</option>
+          <option value="36">36 months</option>
+          <option value="48" selected>48 months (4-yr course)</option>
+          <option value="60">60 months (5-yr course)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <div class="field-header"><span class="field-label">Female student (0.5% concession)</span></div>
+        <select class="field-select" id="fem" onchange="recalc()">
+          <option value="0">No</option>
+          <option value="1">Yes — PSU banks only</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- EMI Display -->
+    <div class="emi-display">
+      <div class="emi-label">Monthly EMI after moratorium</div>
+      <div class="emi-num" id="emiDisp">₹0</div>
+      <div class="emi-sub" id="emiDispSub">—</div>
+      <div class="emi-break">
+        <span class="emi-tag et-p" id="emiTagP">Principal —</span>
+        <span class="emi-tag et-i" id="emiTagI">Interest —</span>
+      </div>
+    </div>
+
+    <!-- Moratorium type callout -->
+    <div id="moratCallout" class="morat-callout mc-simple">
+      <span class="mc-icon">●</span>
+      <span id="moratCalloutTxt">Loading…</span>
+    </div>
+
+  </aside>
+
+  <!-- RIGHT: RESULTS -->
+  <section class="results-panel">
+
+    <!-- 4 metric tiles -->
+    <div class="metrics-row">
+      <div class="metric amb"><div class="metric-lbl">Total Interest</div><div class="metric-val" id="mTotInt">₹0</div><div class="metric-sub" id="mIntSub">% over principal</div></div>
+      <div class="metric red"><div class="metric-lbl">Total Repayment</div><div class="metric-val" id="mTotRep">₹0</div><div class="metric-sub" id="mRepSub">over full tenure</div></div>
+    </div>
+    <div class="metrics-row">
+      <div class="metric acc"><div class="metric-lbl">Effective Monthly Burden</div><div class="metric-val" id="mEffBurden">₹0</div><div class="metric-sub">total ÷ months</div></div>
+      <div class="metric blu"><div class="metric-lbl">Repayment Multiplier</div><div class="metric-val" id="mMult">0×</div><div class="metric-sub" id="mMultSub">vs borrowed</div></div>
+    </div>
+
+    <!-- EMI bar chart -->
+    <div class="chart-card">
+      <div class="cc-header">
+        <span class="cc-title">Principal vs interest per year</span>
+        <div class="cc-legend">
+          <div class="cc-leg-item"><div class="cc-dot" style="background:var(--acc)"></div>Principal</div>
+          <div class="cc-leg-item"><div class="cc-dot" style="background:var(--amb)"></div>Interest</div>
+        </div>
+      </div>
+      <div style="height:180px;position:relative"><canvas id="emiChart"></canvas></div>
+    </div>
+
+    <!-- Deep dive tabs -->
+    <div class="deep-card">
+      <div class="dtabs">
+        <button class="dtab active" onclick="dTab(0,this)"><span class="dtab-num">1</span><span>True Cost</span></button>
+        <button class="dtab" onclick="dTab(1,this)"><span class="dtab-num">2</span><span>College ROI</span></button>
+        <button class="dtab" onclick="dTab(2,this)"><span class="dtab-num">3</span><span>Compare All</span></button>
+      </div>
+
+      <!-- TRUE COST -->
+      <div class="dpanel active" id="dp0">
+        <div class="cost-grid">
+          <div>
+            <div class="toggles-wrap">
+              <div class="tog-row"><div><div class="tog-lbl">Processing Fee</div><div class="tog-sub" id="procFeeDesc">—</div></div><label class="tog"><input type="checkbox" id="tProc" checked onchange="recalc()"><span class="ts"></span></label></div>
+              <div class="tog-row"><div><div class="tog-lbl">GST on fee (18%)</div><div class="tog-sub">NBFCs only</div></div><label class="tog"><input type="checkbox" id="tGST" onchange="recalc()"><span class="ts"></span></label></div>
+              <div class="tog-row"><div><div class="tog-lbl">Loan Insurance</div><div class="tog-sub" id="insurDesc">~0.5% × tenure</div></div><label class="tog"><input type="checkbox" id="tInsur" onchange="recalc()"><span class="ts"></span></label></div>
+              <div class="tog-row"><div><div class="tog-lbl">Moratorium interest</div><div class="tog-sub" id="morDesc">—</div></div><label class="tog"><input type="checkbox" id="tMor" checked onchange="recalc()"><span class="ts"></span></label></div>
+            </div>
+            <div class="rates-compare">
+              <div class="rc-box"><div class="rc-lbl">Stated</div><div class="rc-val" id="statedR" style="color:var(--txt)">—</div></div>
+              <div class="rc-box"><div class="rc-lbl">Effective</div><div class="rc-val" id="effR" style="color:var(--red)">—</div></div>
+            </div>
+            <div class="ins-row" id="insRow"></div>
+          </div>
+          <div>
+            <table class="cost-table">
+              <tr><td>Principal borrowed</td><td id="ftP" style="color:var(--acc)"></td></tr>
+              <tr><td class="muted">+ Morat. interest (<span id="ftMT"></span>)</td><td id="ftM" style="color:var(--amb)"></td></tr>
+              <tr><td class="muted">+ Processing fee</td><td id="ftPrc" style="color:var(--txt2)"></td></tr>
+              <tr><td class="muted">+ GST on fee</td><td id="ftG" style="color:var(--txt2)"></td></tr>
+              <tr><td class="muted">+ Loan insurance</td><td id="ftIns" style="color:var(--txt2)"></td></tr>
+              <tr><td class="muted">+ Repayment interest</td><td id="ftInt" style="color:var(--amb)"></td></tr>
+              <tr class="row-total"><td><strong>True total cost</strong></td><td id="ftTot"><strong style="color:var(--red)"></strong></td></tr>
+            </table>
+            <div style="height:160px;position:relative;margin-top:14px"><canvas id="pieChart"></canvas></div>
+          </div>
+        </div>
+        <div class="amort-wrap">
+          <table class="amort">
+            <thead><tr><th>Year</th><th>Opening</th><th>Principal</th><th>Interest</th><th>Closing</th></tr></thead>
+            <tbody id="amortBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ROI -->
+      <div class="dpanel" id="dp1">
+        <div class="tier-grid">
+          <div class="tier-card sel" onclick="selTier(this,'iit')"><div class="tier-badge tb1">IIT</div><div class="tier-name">IIT/IISc</div><div class="tier-sal">₹22 LPA</div></div>
+          <div class="tier-card" onclick="selTier(this,'nit')"><div class="tier-badge tb2">NIT</div><div class="tier-name">NIT/BITS</div><div class="tier-sal">₹12 LPA</div></div>
+          <div class="tier-card" onclick="selTier(this,'pvt1')"><div class="tier-badge tb2">Pvt-1</div><div class="tier-name">Pvt Tier-1</div><div class="tier-sal">₹9 LPA</div></div>
+          <div class="tier-card" onclick="selTier(this,'state')"><div class="tier-badge tb3">Govt</div><div class="tier-name">State Govt</div><div class="tier-sal">₹6 LPA</div></div>
+          <div class="tier-card" onclick="selTier(this,'pvt2')"><div class="tier-badge tb4">Pvt-2</div><div class="tier-name">Pvt Tier-2</div><div class="tier-sal">₹5 LPA</div></div>
+        </div>
+        <div class="roi-inputs">
+          <div class="roi-field">
+            <label>Annual CTC at graduation</label>
+            <input type="number" id="sal" value="22" min="1" max="100" step="0.5" oninput="updateROI()">
+          </div>
+          <div class="roi-field">
+            <label>Salary growth rate</label>
+            <select id="grow" onchange="updateROI()">
+              <option value="8">Conservative 8%/yr</option>
+              <option value="12" selected>Moderate 12%/yr</option>
+              <option value="18">Optimistic 18%/yr</option>
+            </select>
+          </div>
+          <div class="roi-field">
+            <label>EMI allocation (% take-home)</label>
+            <select id="ePct" onchange="updateROI()">
+              <option value="15">Conservative 15%</option>
+              <option value="25" selected>Standard 25%</option>
+              <option value="35">Aggressive 35%</option>
+              <option value="50">Stretched 50%</option>
+            </select>
+          </div>
+        </div>
+        <div class="be-display">
+          <div class="be-num" id="beY">—</div>
+          <div class="be-lbl">years of gross salary to fully repay this loan</div>
+        </div>
+        <div class="roi-metrics">
+          <div class="rm"><div class="rm-lbl">Debt-to-Income</div><div class="rm-val" id="dtiV" style="color:var(--amb)">—</div></div>
+          <div class="rm"><div class="rm-lbl">Manageable?</div><div class="rm-val" id="affV">—</div></div>
+          <div class="rm"><div class="rm-lbl">Monthly EMI</div><div class="rm-val" id="roiEmi" style="color:var(--acc)">—</div></div>
+        </div>
+        <div style="height:180px;position:relative;margin-bottom:14px"><canvas id="roiChart"></canvas></div>
+        <div class="roi-bar-list" id="tierBars"></div>
+      </div>
+
+      <!-- COMPARE ALL -->
+      <div class="dpanel" id="dp2">
+        <div class="cmp-info" id="cmpInfo">Loading…</div>
+        <div class="cmp-wrap">
+          <table class="cmp-t">
+            <thead><tr><th>Lender</th><th>Type</th><th>Rate</th><th>Morat.</th><th>Morat. Cost</th><th>Proc. Fee</th><th>EMI/mo</th><th>Repayment</th><th>True Total</th></tr></thead>
+            <tbody id="cmpBody"></tbody>
+          </table>
+        </div>
+        <div class="cmp-note">* Based on your inputs from the left panel. Secured/unsecured toggle affects rates. Rates sourced live — verify on lender websites.</div>
+      </div>
+
+    </div><!-- /deep-card -->
+
+  </section>
+</div><!-- /main -->
+
+<script>
+// ═══════════════════════════════════════
+// BANK DATA (hardcoded fallback)
+// ═══════════════════════════════════════
+const BASE_BANKS = [
+  {id:'sbi',name:'State Bank of India',short:'SBI',icon:'🏛',type:'PSU',
+   sec:{mn:8.15,mx:10.90,df:9.50},uns:{mn:10.15,mx:11.75,df:11.0},
+   proc:P=>P<=2000000?0:10000, procKey:'nil_20L',
+   maxS:15000000,maxU:750000,maxTen:15,morat:'simple',
+   femConc:0.5,gst:false,
+   collFree:'₹7.5L',
+   desc:'Lowest domestic rates. Simple interest moratorium. Zero fee up to ₹20L.',
+   col:'#17D9A0',ft:'Nil fee ≤₹20L'},
+  {id:'pnb',name:'Punjab National Bank',short:'PNB',icon:'🏦',type:'PSU',
+   sec:{mn:9.15,mx:11.40,df:10.0},uns:{mn:10.40,mx:12.50,df:11.25},
+   proc:P=>P<=750000?0:P*0.01, procKey:'nil_7.5L_1pct',
+   maxS:10000000,maxU:750000,maxTen:15,morat:'simple',
+   femConc:0.5,gst:false,collFree:'₹7.5L',
+   desc:'Competitive PSU rates. Simple interest moratorium.',
+   col:'#4D9FFF',ft:'Simple interest'},
+  {id:'bob',name:'Bank of Baroda',short:'BOB',icon:'🏦',type:'PSU',
+   sec:{mn:9.70,mx:11.25,df:10.0},uns:{mn:10.50,mx:11.25,df:10.85},
+   proc:P=>P<=750000?0:Math.min(P*0.01,10000), procKey:'nil_7.5L_1pct_cap10k',
+   maxS:15000000,maxU:750000,maxTen:15,morat:'simple',
+   femConc:0.5,gst:false,collFree:'₹7.5L',
+   desc:'Fee capped at ₹10k. Premier institution special rates.',
+   col:'#F59E0B',ft:'Fee capped ₹10k'},
+  {id:'canara',name:'Canara Bank',short:'Canara',icon:'🏛',type:'PSU',
+   sec:{mn:9.25,mx:11.50,df:9.90},uns:{mn:10.50,mx:11.50,df:11.0},
+   proc:P=>P<=750000?0:P*0.005, procKey:'nil_7.5L_0.5pct',
+   maxS:15000000,maxU:750000,maxTen:15,morat:'simple',
+   femConc:0.5,gst:false,collFree:'₹7.5L',
+   desc:'Lowest processing fee (0.5%). Simple interest moratorium.',
+   col:'#9B7FFF',ft:'0.5% fee only'},
+  {id:'union',name:'Union Bank',short:'Union',icon:'🏛',type:'PSU',
+   sec:{mn:8.30,mx:11.30,df:9.30},uns:{mn:10.30,mx:11.30,df:10.80},
+   proc:P=>0, procKey:'nil',
+   maxS:15000000,maxU:750000,maxTen:15,morat:'simple',
+   femConc:0.5,gst:false,collFree:'₹7.5L',
+   desc:'Zero processing fee. Simple interest moratorium only.',
+   col:'#34D399',ft:'Zero proc fee'},
+  {id:'hdfc',name:'HDFC Bank',short:'HDFC',icon:'🔵',type:'Private',
+   sec:{mn:10.00,mx:11.50,df:10.75},uns:{mn:11.00,mx:13.03,df:11.61},
+   proc:P=>P<=750000?0:P*0.01, procKey:'nil_7.5L_1pct',
+   maxS:150000000,maxU:4000000,maxTen:15,morat:'compound',
+   femConc:0,gst:false,collFree:'₹40L',
+   desc:'Fast 7-10 day approval. Compound interest during moratorium. Avg IRR 11.61%.',
+   col:'#4D9FFF',ft:'Fast 7-day process'},
+  {id:'icici',name:'ICICI Bank',short:'ICICI',icon:'🔴',type:'Private',
+   sec:{mn:10.25,mx:12.00,df:10.50},uns:{mn:11.25,mx:13.00,df:11.75},
+   proc:P=>P*0.01, procKey:'1pct',
+   maxS:30000000,maxU:10000000,maxTen:15,morat:'compound',
+   femConc:0,gst:false,collFree:'₹1Cr',
+   desc:'Up to ₹3Cr abroad. ₹1Cr unsecured. 6-month post-course grace.',
+   col:'#FF6060',ft:'₹1Cr unsecured'},
+  {id:'axis',name:'Axis Bank',short:'Axis',icon:'🟣',type:'Private',
+   sec:{mn:9.99,mx:12.50,df:10.50},uns:{mn:11.00,mx:15.20,df:13.00},
+   proc:P=>0, procKey:'nil',
+   maxS:7500000,maxU:10000000,maxTen:15,morat:'compound',
+   femConc:0,gst:false,collFree:'₹1Cr (Prime A)',
+   desc:'No processing fee. Full interest payment required during moratorium (not deferred). Avg 10.97%.',
+   col:'#F59E0B',ft:'No proc fee'},
+  {id:'credila',name:'Credila (ex-HDFC)',short:'Credila',icon:'💼',type:'NBFC',
+   sec:{mn:11.25,mx:12.75,df:11.50},uns:{mn:11.75,mx:13.00,df:12.25},
+   proc:P=>P*0.01, procKey:'1pct_gst',
+   maxS:100000000,maxU:6000000,maxTen:15,morat:'compound',
+   femConc:0,gst:true,collFree:'₹60L',
+   desc:"India's largest education NBFC. Floating (CBLR+spread). 1%+GST fee.",
+   col:'#60A5FA',ft:'Largest NBFC'},
+  {id:'avanse',name:'Avanse Financial',short:'Avanse',icon:'💼',type:'NBFC',
+   sec:{mn:11.00,mx:13.50,df:12.00},uns:{mn:12.00,mx:14.50,df:13.00},
+   proc:P=>P*0.015, procKey:'1.5pct_gst',
+   maxS:100000000,maxU:7500000,maxTen:15,morat:'compound',
+   femConc:0,gst:true,collFree:'₹75L',
+   desc:'₹75L unsecured. 1.5%+GST fee. Compound moratorium interest.',
+   col:'#F472B6',ft:'₹75L unsecured'},
+  {id:'incred',name:'InCred Finance',short:'InCred',icon:'⚡',type:'NBFC',
+   sec:{mn:12.00,mx:14.00,df:13.00},uns:{mn:13.00,mx:15.50,df:14.00},
+   proc:P=>P*0.015, procKey:'1.5pct_gst',
+   maxS:100000000,maxU:5000000,maxTen:12,morat:'compound',
+   femConc:0,gst:true,collFree:'₹50L',
+   desc:'72-hr approval. Highest rates. Max tenure 12 years.',
+   col:'#FB923C',ft:'72hr approval'}
+];
+
+// Live data overlays (populated by API)
+let liveData = {};
+
+// Merge live data onto base banks
+function getBanks() {
+  return BASE_BANKS.map(b => {
+    const ld = liveData[b.id];
+    if (!ld) return b;
+    return {
+      ...b,
+      sec:{mn:ld.s_min??b.sec.mn, mx:ld.s_max??b.sec.mx, df:ld.s_def??b.sec.df},
+      uns:{mn:ld.u_min??b.uns.mn, mx:ld.u_max??b.uns.mx, df:ld.u_def??b.uns.df},
+      maxTen:ld.max_ten??b.maxTen,
+      morat:ld.morat??b.morat,
+      _live:true
+    };
+  });
+}
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let selId = 'sbi', coll = 'secured', selTierKey = 'iit';
+let emiCh = null, pieCh = null, roiCh = null;
+
+const TIERS = {
+  iit:{label:'IIT/IISc',salary:22,col:'#17D9A0'},
+  nit:{label:'NIT/BITS',salary:12,col:'#4D9FFF'},
+  pvt1:{label:'Pvt Tier-1',salary:9,col:'#9B7FFF'},
+  state:{label:'State Govt',salary:6,col:'#F59E0B'},
+  pvt2:{label:'Pvt Tier-2',salary:5,col:'#FF6060'}
+};
+
+// ═══════════════════════════════════════
+// LIVE DATA FETCH
+// ═══════════════════════════════════════
+const BANK_STEPS = [
+  'Searching SBI education loan rates…',
+  'Searching PNB rates…',
+  'Checking Bank of Baroda…',
+  'Checking Canara Bank…',
+  'Verifying Union Bank rates…',
+  'Searching HDFC Bank education loan…',
+  'Checking ICICI Bank rates…',
+  'Verifying Axis Bank data…',
+  'Searching Credila latest rates…',
+  'Checking Avanse & InCred…',
+  'Compiling and verifying data…'
+];
+
+async function fetchLiveRates() {
+  const overlay = document.getElementById('loadOverlay');
+  const stepEl = document.getElementById('loadStep');
+  overlay.classList.remove('hidden');
+  setSyncStatus('syncing', 'Fetching live rates…');
+
+  let stepIdx = 0;
+  const stepInterval = setInterval(() => {
+    stepIdx = (stepIdx + 1) % BANK_STEPS.length;
+    if (stepEl) stepEl.textContent = BANK_STEPS[stepIdx];
+  }, 1800);
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        system: `You are a financial data extractor. Use web_search to find the LATEST education loan interest rates for these 11 Indian lenders:
+SBI (State Bank of India), PNB (Punjab National Bank), BOB (Bank of Baroda), Canara Bank, Union Bank of India, HDFC Bank, ICICI Bank, Axis Bank, Credila (formerly HDFC Credila), Avanse Financial, InCred Finance.
+
+Search for each bank. After searching, return ONLY a valid JSON object — no markdown, no backticks, no explanation, just raw JSON.
+
+Schema (all rate fields are % per annum, numbers only):
+{
+  "ts": "YYYY-MM-DD",
+  "banks": {
+    "sbi":    {"s_min":8.15,"s_max":10.90,"s_def":9.50,"u_min":10.15,"u_max":11.75,"u_def":11.0,"max_ten":15,"morat":"simple"},
+    "pnb":    {"s_min":9.15,"s_max":11.40,"s_def":10.0,"u_min":10.40,"u_max":12.50,"u_def":11.25,"max_ten":15,"morat":"simple"},
+    "bob":    {"s_min":9.70,"s_max":11.25,"s_def":10.0,"u_min":10.50,"u_max":11.25,"u_def":10.85,"max_ten":15,"morat":"simple"},
+    "canara": {"s_min":9.25,"s_max":11.50,"s_def":9.90,"u_min":10.50,"u_max":11.50,"u_def":11.0,"max_ten":15,"morat":"simple"},
+    "union":  {"s_min":8.30,"s_max":11.30,"s_def":9.30,"u_min":10.30,"u_max":11.30,"u_def":10.80,"max_ten":15,"morat":"simple"},
+    "hdfc":   {"s_min":10.00,"s_max":11.50,"s_def":10.75,"u_min":11.00,"u_max":13.03,"u_def":11.61,"max_ten":15,"morat":"compound"},
+    "icici":  {"s_min":10.25,"s_max":12.00,"s_def":10.50,"u_min":11.25,"u_max":13.00,"u_def":11.75,"max_ten":15,"morat":"compound"},
+    "axis":   {"s_min":9.99,"s_max":12.50,"s_def":10.50,"u_min":11.00,"u_max":15.20,"u_def":13.00,"max_ten":15,"morat":"compound"},
+    "credila":{"s_min":11.25,"s_max":12.75,"s_def":11.50,"u_min":11.75,"u_max":13.00,"u_def":12.25,"max_ten":15,"morat":"compound"},
+    "avanse": {"s_min":11.00,"s_max":13.50,"s_def":12.00,"u_min":12.00,"u_max":14.50,"u_def":13.00,"max_ten":15,"morat":"compound"},
+    "incred": {"s_min":12.00,"s_max":14.00,"s_def":13.00,"u_min":13.00,"u_max":15.50,"u_def":14.00,"max_ten":12,"morat":"compound"}
+  }
+}
+Update any values you find from live searches. morat must be "simple" or "compound". Return ONLY the JSON.`,
+        messages: [{ role: 'user', content: 'Search and return the latest education loan rates JSON for all 11 Indian lenders listed.' }]
+      })
+    });
+
+    clearInterval(stepInterval);
+
+    const data = await resp.json();
+
+    // Extract all text blocks from response
+    const texts = (data.content || []).filter(b => b.type === 'text').map(b => b.text);
+    const fullText = texts.join('\n');
+
+    // Find JSON in the response
+    const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.banks) {
+        liveData = parsed.banks;
+        const ts = parsed.ts || new Date().toISOString().slice(0, 10);
+        setSyncStatus('live', `Live · ${ts}`);
+        // Rebuild UI with live data
+        buildBankStrip();
+        applyBankDefaults();
+        recalc();
+      } else {
+        setSyncStatus('fallback', 'Using Apr 2026 data');
+      }
+    } else {
+      setSyncStatus('fallback', 'Using Apr 2026 data');
+    }
+  } catch (e) {
+    clearInterval(stepInterval);
+    setSyncStatus('err', 'Fetch failed · Using Apr 2026 data');
+    console.warn('Live fetch error:', e);
+  }
+
+  overlay.classList.add('hidden');
+}
+
+function setSyncStatus(state, txt) {
+  const dot = document.getElementById('syncDot');
+  const label = document.getElementById('syncTxt');
+  dot.className = 'sync-dot ' + state;
+  label.innerHTML = state === 'live'
+    ? `<strong style="color:var(--acc)">Live</strong> <span>· ${txt.replace('Live · ', '')}</span>`
+    : state === 'syncing'
+    ? `<strong>Fetching rates…</strong>`
+    : `<span style="color:var(--amb)">${txt}</span>`;
+}
+
+// ═══════════════════════════════════════
+// BUILD UI
+// ═══════════════════════════════════════
+function buildBankStrip() {
+  const banks = getBanks();
+  const strip = document.getElementById('bankStrip');
+  strip.innerHTML = banks.map(b => {
+    const rates = coll === 'secured' ? b.sec : b.uns;
+    const isSel = b.id === selId;
+    const isLive = !!liveData[b.id];
+    const typeClass = b.type === 'PSU' ? 'ct-psu' : b.type === 'Private' ? 'ct-pvt' : 'ct-nbc';
+    return `<div class="bchip${isSel ? ' sel' : ''}" id="chip-${b.id}" onclick="selBank('${b.id}')">
+      <span class="bchip-type ${typeClass}">${b.type}</span>
+      <span class="bchip-name">${b.short}</span>
+      <span class="bchip-rate"><strong>${rates.mn}%</strong>–${rates.mx}%</span>
+      <div class="bchip-live${isLive ? '' : ' stale'}" title="${isLive ? 'Live data' : 'Cached data'}"></div>
+    </div>`;
+  }).join('');
+}
+
+function selBank(id) {
+  selId = id;
+  document.querySelectorAll('.bchip').forEach(c => c.classList.remove('sel'));
+  const chip = document.getElementById('chip-' + id);
+  if (chip) chip.classList.add('sel');
+  applyBankDefaults();
+  recalc();
+  // Scroll chip into view
+  if (chip) chip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+}
+
+function setColl(type) {
+  coll = type;
+  document.getElementById('btnSec').classList.toggle('active', type === 'secured');
+  document.getElementById('btnUns').classList.toggle('active', type === 'unsecured');
+  buildBankStrip();
+  applyBankDefaults();
+  recalc();
+}
+
+function applyBankDefaults() {
+  const b = getBanks().find(x => x.id === selId);
+  if (!b) return;
+  const rates = coll === 'secured' ? b.sec : b.uns;
+  const maxAmt = coll === 'secured' ? b.maxS : b.maxU;
+  const defAmt = Math.min(1500000, maxAmt);
+  const maxSlider = Math.min(maxAmt, 10000000);
+
+  // Rate
+  const oldDf = parseFloat(document.getElementById('rate').value) || 0;
+  document.getElementById('rate').value = rates.df;
+  document.getElementById('rS').min = rates.mn;
+  document.getElementById('rS').max = rates.mx;
+  document.getElementById('rS').value = rates.df;
+  document.getElementById('rHint').textContent = `${b.name} range: ${rates.mn}% – ${rates.mx}%`;
+
+  // Show "Updated" badge if rate changed from old value
+  const badge = document.getElementById('rateChangedBadge');
+  badge.style.display = liveData[b.id] ? 'inline' : 'none';
+
+  // Amount
+  document.getElementById('lS').max = maxSlider;
+  document.getElementById('lS').value = defAmt;
+  document.getElementById('lAmt').value = defAmt;
+  document.getElementById('lAmtHint').textContent = `Max ${b.type === 'PSU' ? 'secured' : coll}: ${fmtL(maxAmt)}`;
+
+  // Tenure
+  const curTen = parseInt(document.getElementById('tS').value) || 10;
+  const defTen = Math.min(curTen, b.maxTen);
+  document.getElementById('tS').max = b.maxTen;
+  document.getElementById('tS').value = defTen;
+  document.getElementById('tenureVal').textContent = defTen + ' yr';
+  document.getElementById('tenHint').textContent = `Max tenure: ${b.maxTen} years`;
+
+  // Female
+  document.getElementById('fem').disabled = b.femConc === 0;
+  if (b.femConc === 0) document.getElementById('fem').value = '0';
+
+  // GST toggle
+  document.getElementById('tGST').checked = b.gst;
+  document.getElementById('tGST').disabled = !b.gst;
+
+  // Moratorium type
+  const isSimple = b.morat === 'simple';
+  const callout = document.getElementById('moratCallout');
+  callout.className = 'morat-callout ' + (isSimple ? 'mc-simple' : 'mc-compound');
+  document.getElementById('moratCalloutTxt').innerHTML = isSimple
+    ? '<strong>Simple interest</strong> during moratorium — interest accrues but is NOT compounded. Your true cost is lower vs private lenders.'
+    : '<strong>Compound interest</strong> during moratorium — interest capitalises monthly. Significantly inflates true cost vs PSU banks.';
+
+  // Bank info card
+  document.getElementById('bankIcon').textContent = b.icon;
+  document.getElementById('bankInfoName').textContent = b.name;
+  document.getElementById('bankInfoSub').textContent = b.desc;
+  document.getElementById('bankInfoStats').innerHTML = `
+    <div class="bstat"><div class="bstat-lbl">From</div><div class="bstat-val acc">${rates.mn}%</div></div>
+    <div class="bstat"><div class="bstat-lbl">Max Tenure</div><div class="bstat-val">${b.maxTen}yr</div></div>
+    <div class="bstat"><div class="bstat-lbl">Morat. Type</div><div class="bstat-val ${isSimple ? 'acc' : ''}" style="${isSimple?'':'color:var(--red)'}">${b.morat}</div></div>
+  `;
+}
+
+// ═══════════════════════════════════════
+// SLIDER SYNC
+// ═══════════════════════════════════════
+function syncIn(inId, slId) {
+  const v = parseFloat(document.getElementById(inId).value) || 0;
+  document.getElementById(slId).value = v;
+}
+function syncSl(slId, inId) {
+  const v = parseFloat(document.getElementById(slId).value);
+  document.getElementById(inId).value = v;
+}
+function syncSlTen(slider) {
+  document.getElementById('tenureVal').textContent = slider.value + ' yr';
+}
+
+// ═══════════════════════════════════════
+// MATH
+// ═══════════════════════════════════════
+function gp() {
+  const b = getBanks().find(x => x.id === selId);
+  let P = parseFloat(document.getElementById('lAmt').value) || 1500000;
+  let r = parseFloat(document.getElementById('rate').value) / 100 || 0.095;
+  const n = parseInt(document.getElementById('tS').value) || 10;
+  const mm = parseInt(document.getElementById('mor').value) || 0;
+  const isFem = document.getElementById('fem').value === '1' && b && b.femConc > 0;
+  if (isFem) r -= 0.005;
+  return { P, r, n, mm, b };
+}
+
+function calcMI(P, r, mm, type) {
+  if (!mm) return 0;
+  if (type === 'simple') return P * (r / 12) * mm;
+  return P * (Math.pow(1 + r / 12, mm) - 1);
+}
+
+function calcEMI(P, r, n) {
+  const mr = r / 12, mn = n * 12;
+  if (mr === 0) return P / mn;
+  return P * mr * Math.pow(1 + mr, mn) / (Math.pow(1 + mr, mn) - 1);
+}
+
+// Animated number counter
+const animTargets = {};
+function animNum(id, newVal, fmtFn) {
+  if (animTargets[id] !== undefined && Math.abs(animTargets[id] - newVal) < 1) {
+    document.getElementById(id).textContent = fmtFn(newVal);
+    return;
+  }
+  animTargets[id] = newVal;
+  const el = document.getElementById(id);
+  const startVal = parseFloat(el.dataset.raw || 0);
+  const start = Date.now();
+  const dur = 280;
+  const tick = () => {
+    const p = Math.min((Date.now() - start) / dur, 1);
+    const e = 1 - Math.pow(1 - p, 3);
+    const cur = startVal + (newVal - startVal) * e;
+    el.textContent = fmtFn(cur);
+    if (p < 1) requestAnimationFrame(tick);
+    else el.dataset.raw = newVal;
+  };
+  requestAnimationFrame(tick);
+}
+
+// ═══════════════════════════════════════
+// MAIN RECALC
+// ═══════════════════════════════════════
+function recalc() {
+  const { P, r, n, mm, b } = gp();
+  if (!b) return;
+
+  const useM = document.getElementById('tMor').checked;
+  const useP = document.getElementById('tProc').checked;
+  const useG = document.getElementById('tGST').checked;
+  const useI = document.getElementById('tInsur').checked;
+
+  const mi = useM ? calcMI(P, r, mm, b.morat) : 0;
+  const ep = P + mi;
+  const emi = calcEMI(ep, r, n);
+  const tr = emi * n * 12;
+  const ti = tr - ep;
+  const pf = useP ? b.proc(P) : 0;
+  const gst = useG ? pf * 0.18 : 0;
+  const ins = useI ? P * 0.005 * n : 0;
+  const tt = tr + pf + gst + ins;
+  const er = ((tt / P - 1) / n * 100).toFixed(2);
+  const mult = (tt / P).toFixed(2);
+  const mr = r / 12;
+
+  // Left panel EMI
+  animNum('emiDisp', emi, fmt);
+  document.getElementById('emiDispSub').textContent = mm > 0
+    ? `After ${mm}-month moratorium · ${n}-year tenure`
+    : `${n}-year repayment tenure`;
+  document.getElementById('emiTagP').textContent = `Principal ${((ep / tr) * 100).toFixed(0)}%`;
+  document.getElementById('emiTagI').textContent = `Interest ${((ti / tr) * 100).toFixed(0)}%`;
+
+  // Metrics
+  animNum('mTotInt', ti, fmt);
+  document.getElementById('mIntSub').textContent = ((ti / P) * 100).toFixed(0) + '% over principal';
+  animNum('mTotRep', tr, fmt);
+  document.getElementById('mRepSub').textContent = `over ${n} years`;
+  animNum('mEffBurden', tt / (n * 12), fmt);
+  document.getElementById('mMult').textContent = mult + '×';
+  document.getElementById('mMultSub').textContent = 'vs ₹' + (P / 1e5).toFixed(1) + 'L borrowed';
+
+  // EMI chart
+  const lbls = [], pA = [], iA = [];
+  let bal = ep;
+  for (let y = 1; y <= n; y++) {
+    let yp = 0, yi = 0;
+    for (let m = 0; m < 12 && bal > 0; m++) {
+      const ip = bal * mr;
+      const pp = Math.min(emi - ip, bal);
+      yi += ip; yp += pp; bal -= pp;
+    }
+    lbls.push('Y' + y); pA.push(Math.round(yp)); iA.push(Math.round(yi));
+  }
+  if (emiCh) emiCh.destroy();
+  emiCh = new Chart(document.getElementById('emiChart'), {
+    type: 'bar',
+    data: { labels: lbls, datasets: [
+      { label: 'Principal', data: pA, backgroundColor: 'rgba(23,217,160,0.6)', borderRadius: 3, borderSkipped: false },
+      { label: 'Interest', data: iA, backgroundColor: 'rgba(245,158,11,0.55)', borderRadius: 3, borderSkipped: false }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { stacked: true, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#4A5B7A', font: { size: 9, family: "'JetBrains Mono',monospace" } } },
+        y: { stacked: true, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#4A5B7A', font: { size: 9, family: "'JetBrains Mono',monospace" }, callback: v => '₹' + (v/1000).toFixed(0) + 'k' } }
+      }
+    }
+  });
+
+  // True Cost tab
+  document.getElementById('procFeeDesc').textContent = b.procKey === 'nil' ? 'Nil' : b.procKey === 'nil_20L' ? 'Nil ≤₹20L, flat ₹10k above' : b.procKey === 'nil_7.5L_1pct' ? 'Nil ≤₹7.5L, 1% above' : b.procKey === 'nil_7.5L_0.5pct' ? 'Nil ≤₹7.5L, 0.5% above' : b.procKey;
+  document.getElementById('morDesc').textContent = `${b.morat} interest · ${mm} months = ${fmt(mi)}`;
+  document.getElementById('insurDesc').textContent = `0.5% × ${n}yr = ${fmt(P * 0.005 * n)}`;
+  document.getElementById('ftMT').textContent = b.morat;
+  document.getElementById('ftP').textContent = fmt(P);
+  document.getElementById('ftM').textContent = fmt(mi);
+  document.getElementById('ftPrc').textContent = fmt(pf);
+  document.getElementById('ftG').textContent = fmt(gst);
+  document.getElementById('ftIns').textContent = fmt(ins);
+  document.getElementById('ftInt').textContent = fmt(ti);
+  document.getElementById('ftTot').innerHTML = `<strong style="color:var(--red)">${fmt(tt)}</strong>`;
+  document.getElementById('statedR').textContent = (r * 100).toFixed(2) + '%';
+  document.getElementById('effR').textContent = er + '%';
+
+  // Pie chart
+  if (pieCh) pieCh.destroy();
+  pieCh = new Chart(document.getElementById('pieChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Principal', 'Morat. Interest', 'Repayment Interest', 'Fees'],
+      datasets: [{ data: [P, mi, ti, pf + gst + ins].map(x => Math.max(0, x)), backgroundColor: ['#17D9A0', '#F59E0B', '#F59E0Baa', '#4A5B7A'], borderWidth: 2, borderColor: '#111E35' }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'bottom', labels: { color: '#4A5B7A', font: { size: 9 }, boxWidth: 8, padding: 8 } }, tooltip: { callbacks: { label: ctx => ' ' + fmt(ctx.raw) } } } }
+  });
+
+  // Insights
+  let ins2 = '';
+  if (mult > 2.5) ins2 += `<span class="ins-tag it-b">You repay ${mult}× borrowed</span>`;
+  else if (mult > 2) ins2 += `<span class="ins-tag it-w">${mult}× repayment ratio</span>`;
+  else ins2 += `<span class="ins-tag it-g">✓ ${mult}× — healthy</span>`;
+  if (b.morat === 'compound' && mm > 0) ins2 += `<span class="ins-tag it-b">Compound morat. adds ${fmt(mi - P*(r/12)*mm)} extra vs PSU</span>`;
+  if (b.morat === 'simple') ins2 += `<span class="ins-tag it-g">✓ Simple interest moratorium</span>`;
+  if (pf === 0) ins2 += `<span class="ins-tag it-g">✓ Zero processing fee</span>`;
+  if (b.femConc > 0 && document.getElementById('fem').value === '1') ins2 += `<span class="ins-tag it-g">✓ 0.5% female concession</span>`;
+  document.getElementById('insRow').innerHTML = ins2;
+
+  // Amortization
+  let ah = '', ab = ep;
+  for (let y = 1; y <= n; y++) {
+    const op = ab; let ap = 0, ai = 0;
+    for (let m = 0; m < 12 && ab > 0; m++) {
+      const ip = ab * mr; const pp = Math.min(emi - ip, ab);
+      ai += ip; ap += pp; ab -= pp;
+    }
+    ah += `<tr><td>${y}</td><td class="cmut">${fmtL(op)}</td><td class="ca">${fmtL(ap)}</td><td class="cam">${fmtL(ai)}</td><td class="cmut">${fmtL(Math.max(0,ab))}</td></tr>`;
+  }
+  document.getElementById('amortBody').innerHTML = ah;
+
+  // Compare
+  buildCompare(P, r, n, mm);
+  updateROI();
+}
+
+// ═══════════════════════════════════════
+// COMPARE
+// ═══════════════════════════════════════
+function buildCompare(P, r, n, mm) {
+  const banks = getBanks();
+  const rows = banks.map(b => {
+    const rates = coll === 'secured' ? b.sec : b.uns;
+    const ri = rates.df / 100;
+    const mi = calcMI(P, ri, mm, b.morat);
+    const ep = P + mi;
+    const emi = calcEMI(ep, ri, Math.min(n, b.maxTen));
+    const tr = emi * Math.min(n, b.maxTen) * 12;
+    const pf = b.proc(P);
+    const gst = b.gst ? pf * 0.18 : 0;
+    const tt = tr + pf + gst;
+    return { b, ri, mi, emi, tr, pf, gst, tt };
+  }).sort((a, b) => a.tt - b.tt);
+
+  const best = rows[0].tt;
+  const saving = rows[rows.length - 1].tt - best;
+  document.getElementById('cmpInfo').textContent =
+    `Loan: ${fmtL(P)} · ${n}-yr · ${mm}-month moratorium · ${coll}. Best lender saves you ${fmt(saving)} vs worst for this exact loan.`;
+
+  document.getElementById('cmpBody').innerHTML = rows.map((row, i) => {
+    const isBest = i === 0;
+    const pa = i === 0 ? '' : `+${((row.tt / best - 1) * 100).toFixed(1)}%`;
+    const tc = row.b.type === 'PSU' ? 'ct-psu' : row.b.type === 'Private' ? 'ct-pvt' : 'ct-nbc';
+    const liveIndicator = liveData[row.b.id] ? ' <span style="font-size:9px;color:var(--acc);margin-left:3px">●</span>' : '';
+    return `<tr class="${isBest ? 'best' : ''}">
+      <td><span style="font-weight:500">${row.b.name}${liveIndicator}</span>${isBest ? '<span class="best-pill">BEST</span>' : ''}</td>
+      <td><span class="bchip-type ${tc}">${row.b.type}</span></td>
+      <td class="${isBest ? 'c-hi' : 'c-def'}">${(row.ri * 100).toFixed(2)}%</td>
+      <td><span class="it-pill ${row.b.morat === 'simple' ? 'its' : 'itc'}">${row.b.morat}</span></td>
+      <td class="${row.b.morat === 'compound' ? 'c-mid' : 'c-hi'}">${fmtL(row.mi)}</td>
+      <td class="c-def">${fmt(row.pf + row.gst)}</td>
+      <td class="c-def">${fmt(row.emi)}</td>
+      <td class="c-def">${fmtL(row.tr)}</td>
+      <td class="${isBest ? 'c-hi' : i === rows.length - 1 ? 'c-bad' : 'c-mid'}">${fmtL(row.tt)}<span style="font-size:10px;color:var(--txt3);margin-left:4px">${pa}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+// ROI
+// ═══════════════════════════════════════
+function selTier(el, key) {
+  document.querySelectorAll('.tier-card').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
+  selTierKey = key;
+  document.getElementById('sal').value = TIERS[key].salary;
+  updateROI();
+}
+
+function updateROI() {
+  const { P, r, n, mm, b } = gp();
+  if (!b) return;
+  const mi = calcMI(P, r, mm, b.morat);
+  const ep = P + mi;
+  const emi = calcEMI(ep, r, n);
+  const tr = emi * n * 12;
+  const sal = parseFloat(document.getElementById('sal').value) || 10;
+  const grow = parseFloat(document.getElementById('grow').value) / 100 || 0.12;
+  const ePct = parseInt(document.getElementById('ePct').value) || 25;
+  const mthTH = (sal * 1e5) / 12 * 0.75;
+  const dti = ((emi / mthTH) * 100).toFixed(0);
+  const ok = emi <= mthTH * (ePct / 100);
+
+  document.getElementById('dtiV').textContent = dti + '%';
+  document.getElementById('dtiV').style.color = dti > 50 ? 'var(--red)' : dti > 30 ? 'var(--amb)' : 'var(--acc)';
+  document.getElementById('affV').textContent = ok ? '✓ Yes' : '✗ Tight';
+  document.getElementById('affV').style.color = ok ? 'var(--acc)' : 'var(--red)';
+  animNum('roiEmi', emi, fmt);
+
+  let be = 0, cum = 0;
+  for (let y = 1; y <= 30; y++) {
+    cum += sal * Math.pow(1 + grow, y - 1) * 1e5;
+    if (cum >= tr && be === 0) { be = y; break; }
+  }
+  document.getElementById('beY').textContent = be || '>30';
+
+  // ROI chart
+  const rl = [], cs = [], ce = [];
+  let c2 = 0;
+  for (let y = 1; y <= Math.min(n + 2, 15); y++) {
+    c2 += sal * Math.pow(1 + grow, y - 1) * 1e5;
+    cs.push(Math.round(c2 / 1e5));
+    ce.push(Math.round(tr / n * Math.min(y, n) / 1e5));
+    rl.push('Y' + y);
+  }
+  if (roiCh) roiCh.destroy();
+  roiCh = new Chart(document.getElementById('roiChart'), {
+    type: 'line',
+    data: { labels: rl, datasets: [
+      { label: 'Cumulative Income', data: cs, borderColor: '#17D9A0', backgroundColor: 'rgba(23,217,160,0.06)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 2 },
+      { label: 'Loan Repaid', data: ce, borderColor: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.04)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 2, borderDash: [4, 3] }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#4A5B7A', font: { size: 10 }, boxWidth: 10 } } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#4A5B7A', font: { size: 9 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#4A5B7A', font: { size: 9 }, callback: v => '₹' + v + 'L' } }
+      }
+    }
+  });
+
+  // Tier comparison bars
+  const maxS = Math.max(...Object.values(TIERS).map(t => t.salary));
+  document.getElementById('tierBars').innerHTML = Object.entries(TIERS).map(([k, td]) => {
+    const tbe = Math.min(30, Math.ceil(tr / (td.salary * 1e5)));
+    const bw = Math.round((td.salary / maxS) * 100);
+    const isSel = k === selTierKey;
+    return `<div class="roi-bar-row">
+      <div class="roi-bar-lbl">
+        <span class="n" style="${isSel ? 'color:var(--acc)' : ''}">${td.label}${isSel ? ' ←' : ''}</span>
+        <span class="v">₹${td.salary} LPA · break-even ${tbe}yr</span>
+      </div>
+      <div class="roi-bar-bg"><div class="roi-bar-fill" style="width:${bw}%;background:${td.col}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════
+function dTab(idx, btn) {
+  document.querySelectorAll('.dtab').forEach((t, i) => t.classList.toggle('active', i === idx));
+  document.querySelectorAll('.dpanel').forEach((p, i) => p.classList.toggle('active', i === idx));
+}
+
+// ═══════════════════════════════════════
+// FORMAT
+// ═══════════════════════════════════════
+function fmt(n) {
+  if (n >= 1e7) return '₹' + (n / 1e7).toFixed(2) + 'Cr';
+  if (n >= 1e5) return '₹' + (n / 1e5).toFixed(2) + 'L';
+  return '₹' + Math.round(n).toLocaleString('en-IN');
+}
+function fmtL(n) { return '₹' + (n / 1e5).toFixed(1) + 'L'; }
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+function init() {
+  buildBankStrip();
+  applyBankDefaults();
+  recalc();
+  // Auto-fetch on load
+  setTimeout(fetchLiveRates, 800);
+}
+
+init();
+</script>
+</body>
+</html>
