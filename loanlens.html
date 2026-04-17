@@ -48,7 +48,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .sync-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 .sync-dot.live{background:var(--acc);box-shadow:0 0 0 3px rgba(23,217,160,0.25);animation:pulse 2s infinite;}
 .sync-dot.syncing{background:var(--amb);animation:spin-dot 1s linear infinite;}
-.sync-dot.fallback{background:var(--amb);}
+.sync-dot.cached{background:var(--acc);opacity:0.6;}
+.sync-dot.fallback{background:var(--txt3);}
 .sync-dot.err{background:var(--red);}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(23,217,160,0.25);}50%{box-shadow:0 0 0 6px rgba(23,217,160,0.08);}}
 @keyframes spin-dot{0%{opacity:1;}50%{opacity:0.3;}100%{opacity:1;}}
@@ -264,16 +265,6 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;bac
 .itc{background:var(--red2);color:var(--red);}
 .cmp-note{font-size:10px;color:var(--txt3);margin-top:10px;}
 
-/* LOADING OVERLAY */
-.load-overlay{position:fixed;inset:0;background:rgba(6,12,26,0.85);backdrop-filter:blur(8px);z-index:999;display:grid;place-items:center;transition:opacity .4s;}
-.load-overlay.hidden{opacity:0;pointer-events:none;}
-.load-box{text-align:center;}
-.load-spinner{width:40px;height:40px;border:2px solid var(--s3);border-top-color:var(--acc);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
-@keyframes spin{to{transform:rotate(360deg);}}
-.load-txt{font-family:var(--disp);font-size:16px;font-weight:700;color:var(--txt);margin-bottom:6px;}
-.load-sub{font-size:12px;color:var(--txt2);}
-.load-step{font-size:11px;color:var(--acc);margin-top:8px;font-family:var(--mono);}
-
 /* MISC */
 .divider{border:none;border-top:1px solid var(--border);margin:14px 0;}
 @media(max-width:900px){.bank-strip-wrap{top:56px;}.config-panel{top:auto;}}
@@ -281,16 +272,6 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;bac
 </style>
 </head>
 <body>
-
-<!-- LOADING -->
-<div class="load-overlay" id="loadOverlay">
-  <div class="load-box">
-    <div class="load-spinner"></div>
-    <div class="load-txt">Fetching live rates</div>
-    <div class="load-sub">Pulling latest data from all 11 lenders</div>
-    <div class="load-step" id="loadStep">Searching SBI education loan rates...</div>
-  </div>
-</div>
 
 <!-- HEADER -->
 <header class="hdr">
@@ -300,9 +281,9 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;bac
       <span class="logo-txt">Loan<em>Lens</em></span>
     </div>
     <div class="hdr-gap"></div>
-    <button class="sync-pill" id="syncPill" onclick="fetchLiveRates()">
-      <div class="sync-dot syncing" id="syncDot"></div>
-      <span class="sync-txt" id="syncTxt"><strong>Fetching rates…</strong></span>
+    <button class="sync-pill" id="syncPill" onclick="fetchLiveRates()" title="Uses 1 API call — click to fetch latest rates">
+      <div class="sync-dot fallback" id="syncDot"></div>
+      <span id="syncTxt"><span style="color:var(--txt3)">Apr 2026 data · Click to refresh</span></span>
     </button>
     <span class="hdr-badge">STEM India</span>
   </div>
@@ -675,97 +656,218 @@ const BANK_STEPS = [
   'Compiling and verifying data…'
 ];
 
-async function fetchLiveRates() {
-  const overlay = document.getElementById('loadOverlay');
-  const stepEl = document.getElementById('loadStep');
-  overlay.classList.remove('hidden');
-  setSyncStatus('syncing', 'Fetching live rates…');
 
-  let stepIdx = 0;
-  const stepInterval = setInterval(() => {
-    stepIdx = (stepIdx + 1) % BANK_STEPS.length;
-    if (stepEl) stepEl.textContent = BANK_STEPS[stepIdx];
-  }, 1800);
+
+
+
+// ═══════════════════════════════════════
+// PERSISTENCE & SYNC MANAGEMENT
+// ═══════════════════════════════════════
+
+const LS_KEY = 'loanlens_rates_v1';
+const LS_KEY_KEY = 'loanlens_api_key';
+
+function saveToCache(banks, ts) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({ banks, ts, savedAt: Date.now() }));
+  } catch(e) { /* localStorage unavailable in some sandboxes */ }
+}
+
+function loadFromCache() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch(e) { return null; }
+}
+
+function getStoredKey() {
+  try { return localStorage.getItem(LS_KEY_KEY) || ''; } catch(e) { return ''; }
+}
+function saveKey(k) {
+  try { localStorage.setItem(LS_KEY_KEY, k); } catch(e) {}
+}
+function clearKey() {
+  try { localStorage.removeItem(LS_KEY_KEY); } catch(e) {}
+}
+
+function setSyncStatus(state, label) {
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncTxt');
+  dot.className = 'sync-dot ' + state;
+  const map = {
+    live:     () => `<strong style="color:var(--acc)">Live</strong><span style="color:var(--txt2);margin-left:4px">· ${label}</span>`,
+    syncing:  () => `<span style="color:var(--amb)">Syncing…</span>`,
+    cached:   () => `<span style="color:var(--txt2)">Cached</span><span style="color:var(--txt3);margin-left:4px">· ${label}</span>`,
+    fallback: () => `<span style="color:var(--txt3)">Apr 2026 data</span><span style="color:var(--txt3);margin-left:4px">· Click to refresh</span>`,
+    err:      () => `<span style="color:var(--red)">Sync failed</span><span style="color:var(--txt3);margin-left:4px">· Click to retry</span>`
+  };
+  txt.innerHTML = (map[state] || map.fallback)();
+}
+
+function applyLiveData(banks, ts, fromCache) {
+  liveData = banks;
+  const label = fromCache
+    ? `${ts} · cached`
+    : ts;
+  setSyncStatus(fromCache ? 'cached' : 'live', label);
+  buildBankStrip();
+  applyBankDefaults();
+  recalc();
+}
+
+// ─── API KEY MODAL ───
+function showKeyModal(onConfirm) {
+  const existing = getStoredKey();
+  const overlay = document.createElement('div');
+  overlay.id = 'keyModal';
+  overlay.style.cssText = `position:fixed;inset:0;background:rgba(6,12,26,0.88);backdrop-filter:blur(10px);z-index:500;display:grid;place-items:center;padding:24px;`;
+  overlay.innerHTML = `
+    <div style="background:var(--s2);border:1px solid var(--border2);border-radius:16px;padding:28px;max-width:440px;width:100%;">
+      <div style="font-family:var(--disp);font-size:17px;font-weight:700;margin-bottom:6px;">🔑 Anthropic API Key</div>
+      <div style="font-size:12px;color:var(--txt2);line-height:1.6;margin-bottom:18px;">
+        LoanLens uses the Anthropic API with web search to pull the latest bank rates on demand.<br><br>
+        <strong style="color:var(--txt)">Inside Claude.ai:</strong> No key needed — auth is handled automatically.<br>
+        <strong style="color:var(--txt)">Outside Claude.ai:</strong> Paste your key below. It's stored only in your browser's localStorage and never sent anywhere except Anthropic.
+      </div>
+      <input id="keyInput" type="password" placeholder="sk-ant-api03-…"
+        style="width:100%;padding:10px 13px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--txt);font-family:var(--mono);font-size:12px;outline:none;margin-bottom:8px;"
+        value="${existing}">
+      <div style="font-size:10px;color:var(--txt3);margin-bottom:18px;">
+        Get a key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--acc)">console.anthropic.com</a> · Each fetch uses ~1 API call with web search.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="confirmKey()" style="flex:1;padding:10px;background:var(--acc);color:var(--bg);border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--body);">Fetch Live Rates</button>
+        <button onclick="tryWithoutKey()" style="flex:1;padding:10px;background:transparent;color:var(--txt2);border:1px solid var(--border2);border-radius:8px;font-size:13px;cursor:pointer;font-family:var(--body);">Try without key (Claude.ai only)</button>
+      </div>
+      ${existing ? `<button onclick="forgetKey()" style="margin-top:10px;width:100%;padding:8px;background:transparent;color:var(--red);border:none;font-size:11px;cursor:pointer;font-family:var(--body);">Forget saved key</button>` : ''}
+      <button onclick="closeKeyModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--txt3);font-size:20px;cursor:pointer;line-height:1;">×</button>
+    </div>`;
+  overlay.style.position = 'fixed';
+  document.body.appendChild(overlay);
+
+  window._keyModalConfirm = onConfirm;
+  document.getElementById('keyInput').focus();
+  document.getElementById('keyInput').addEventListener('keydown', e => { if (e.key === 'Enter') confirmKey(); });
+}
+
+function closeKeyModal() {
+  const m = document.getElementById('keyModal');
+  if (m) m.remove();
+}
+
+function confirmKey() {
+  const k = document.getElementById('keyInput').value.trim();
+  if (k) saveKey(k);
+  closeKeyModal();
+  if (window._keyModalConfirm) window._keyModalConfirm(k || null);
+}
+
+function tryWithoutKey() {
+  closeKeyModal();
+  if (window._keyModalConfirm) window._keyModalConfirm(null);
+}
+
+function forgetKey() {
+  clearKey();
+  closeKeyModal();
+  showToast('API key removed from browser storage.', 'amb');
+}
+
+// ─── MAIN FETCH (click-only) ───
+async function fetchLiveRates() {
+  showKeyModal(async (apiKey) => {
+    await doFetch(apiKey);
+  });
+}
+
+async function doFetch(apiKey) {
+  setSyncStatus('syncing', '');
+
+  const steps = ['Searching SBI…','Checking PNB & BOB…','Verifying private banks…','Checking NBFCs…','Compiling…'];
+  let si = 0;
+  const iv = setInterval(() => {
+    si = (si + 1) % steps.length;
+    document.getElementById('syncTxt').innerHTML = `<span style="color:var(--amb)">Syncing — ${steps[si]}</span>`;
+  }, 2400);
+
+  const headers = { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-only-flag': 'true' };
+  if (apiKey) headers['x-api-key'] = apiKey;
 
   try {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2000,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        system: `You are a financial data extractor. Use web_search to find the LATEST education loan interest rates for these 11 Indian lenders:
-SBI (State Bank of India), PNB (Punjab National Bank), BOB (Bank of Baroda), Canara Bank, Union Bank of India, HDFC Bank, ICICI Bank, Axis Bank, Credila (formerly HDFC Credila), Avanse Financial, InCred Finance.
+        system: `You are a financial data extractor. Search the web for the LATEST education loan interest rates for these 11 Indian lenders: SBI, PNB, Bank of Baroda, Canara Bank, Union Bank of India, HDFC Bank, ICICI Bank, Axis Bank, Credila, Avanse Financial, InCred Finance.
 
-Search for each bank. After searching, return ONLY a valid JSON object — no markdown, no backticks, no explanation, just raw JSON.
-
-Schema (all rate fields are % per annum, numbers only):
-{
-  "ts": "YYYY-MM-DD",
-  "banks": {
-    "sbi":    {"s_min":8.15,"s_max":10.90,"s_def":9.50,"u_min":10.15,"u_max":11.75,"u_def":11.0,"max_ten":15,"morat":"simple"},
-    "pnb":    {"s_min":9.15,"s_max":11.40,"s_def":10.0,"u_min":10.40,"u_max":12.50,"u_def":11.25,"max_ten":15,"morat":"simple"},
-    "bob":    {"s_min":9.70,"s_max":11.25,"s_def":10.0,"u_min":10.50,"u_max":11.25,"u_def":10.85,"max_ten":15,"morat":"simple"},
-    "canara": {"s_min":9.25,"s_max":11.50,"s_def":9.90,"u_min":10.50,"u_max":11.50,"u_def":11.0,"max_ten":15,"morat":"simple"},
-    "union":  {"s_min":8.30,"s_max":11.30,"s_def":9.30,"u_min":10.30,"u_max":11.30,"u_def":10.80,"max_ten":15,"morat":"simple"},
-    "hdfc":   {"s_min":10.00,"s_max":11.50,"s_def":10.75,"u_min":11.00,"u_max":13.03,"u_def":11.61,"max_ten":15,"morat":"compound"},
-    "icici":  {"s_min":10.25,"s_max":12.00,"s_def":10.50,"u_min":11.25,"u_max":13.00,"u_def":11.75,"max_ten":15,"morat":"compound"},
-    "axis":   {"s_min":9.99,"s_max":12.50,"s_def":10.50,"u_min":11.00,"u_max":15.20,"u_def":13.00,"max_ten":15,"morat":"compound"},
-    "credila":{"s_min":11.25,"s_max":12.75,"s_def":11.50,"u_min":11.75,"u_max":13.00,"u_def":12.25,"max_ten":15,"morat":"compound"},
-    "avanse": {"s_min":11.00,"s_max":13.50,"s_def":12.00,"u_min":12.00,"u_max":14.50,"u_def":13.00,"max_ten":15,"morat":"compound"},
-    "incred": {"s_min":12.00,"s_max":14.00,"s_def":13.00,"u_min":13.00,"u_max":15.50,"u_def":14.00,"max_ten":12,"morat":"compound"}
-  }
-}
-Update any values you find from live searches. morat must be "simple" or "compound". Return ONLY the JSON.`,
-        messages: [{ role: 'user', content: 'Search and return the latest education loan rates JSON for all 11 Indian lenders listed.' }]
+Return ONLY a raw JSON object — no markdown, no backticks, no explanation:
+{"ts":"YYYY-MM-DD","banks":{"sbi":{"s_min":8.15,"s_max":10.90,"s_def":9.50,"u_min":10.15,"u_max":11.75,"u_def":11.0,"max_ten":15,"morat":"simple"},"pnb":{"s_min":9.15,"s_max":11.40,"s_def":10.0,"u_min":10.40,"u_max":12.50,"u_def":11.25,"max_ten":15,"morat":"simple"},"bob":{"s_min":9.70,"s_max":11.25,"s_def":10.0,"u_min":10.50,"u_max":11.25,"u_def":10.85,"max_ten":15,"morat":"simple"},"canara":{"s_min":9.25,"s_max":11.50,"s_def":9.90,"u_min":10.50,"u_max":11.50,"u_def":11.0,"max_ten":15,"morat":"simple"},"union":{"s_min":8.30,"s_max":11.30,"s_def":9.30,"u_min":10.30,"u_max":11.30,"u_def":10.80,"max_ten":15,"morat":"simple"},"hdfc":{"s_min":10.00,"s_max":11.50,"s_def":10.75,"u_min":11.00,"u_max":13.03,"u_def":11.61,"max_ten":15,"morat":"compound"},"icici":{"s_min":10.25,"s_max":12.00,"s_def":10.50,"u_min":11.25,"u_max":13.00,"u_def":11.75,"max_ten":15,"morat":"compound"},"axis":{"s_min":9.99,"s_max":12.50,"s_def":10.50,"u_min":11.00,"u_max":15.20,"u_def":13.00,"max_ten":15,"morat":"compound"},"credila":{"s_min":11.25,"s_max":12.75,"s_def":11.50,"u_min":11.75,"u_max":13.00,"u_def":12.25,"max_ten":15,"morat":"compound"},"avanse":{"s_min":11.00,"s_max":13.50,"s_def":12.00,"u_min":12.00,"u_max":14.50,"u_def":13.00,"max_ten":15,"morat":"compound"},"incred":{"s_min":12.00,"s_max":14.00,"s_def":13.00,"u_min":13.00,"u_max":15.50,"u_def":14.00,"max_ten":12,"morat":"compound"}}}
+Search, update values found, morat must be "simple" or "compound". Return ONLY the JSON.`,
+        messages: [{ role: 'user', content: 'Fetch latest Indian education loan rates and return the JSON.' }]
       })
     });
 
-    clearInterval(stepInterval);
+    clearInterval(iv);
+
+    if (!resp.ok) {
+      const eb = await resp.json().catch(() => ({}));
+      const msg = eb.error?.message || resp.statusText;
+      if (resp.status === 401) throw new Error('AUTH:' + msg);
+      throw new Error(`HTTP ${resp.status}: ${msg}`);
+    }
 
     const data = await resp.json();
+    const fullText = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    const m = fullText.match(/\{[\s\S]*?"banks"[\s\S]*\}/);
+    if (!m) throw new Error('PARSE: No JSON found in response');
 
-    // Extract all text blocks from response
-    const texts = (data.content || []).filter(b => b.type === 'text').map(b => b.text);
-    const fullText = texts.join('\n');
+    const parsed = JSON.parse(m[0]);
+    if (!parsed.banks) throw new Error('PARSE: Missing banks key');
 
-    // Find JSON in the response
-    const jsonMatch = fullText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      if (parsed.banks) {
-        liveData = parsed.banks;
-        const ts = parsed.ts || new Date().toISOString().slice(0, 10);
-        setSyncStatus('live', `Live · ${ts}`);
-        // Rebuild UI with live data
-        buildBankStrip();
-        applyBankDefaults();
-        recalc();
-      } else {
-        setSyncStatus('fallback', 'Using Apr 2026 data');
-      }
-    } else {
-      setSyncStatus('fallback', 'Using Apr 2026 data');
-    }
+    const ts = parsed.ts || new Date().toISOString().slice(0, 10);
+    saveToCache(parsed.banks, ts);
+    applyLiveData(parsed.banks, ts, false);
+    showToast(`✓ Live rates updated — all 11 lenders synced as of ${ts}`, 'acc');
+
   } catch (e) {
-    clearInterval(stepInterval);
-    setSyncStatus('err', 'Fetch failed · Using Apr 2026 data');
-    console.warn('Live fetch error:', e);
-  }
+    clearInterval(iv);
+    console.warn('LoanLens fetch error:', e.message);
 
-  overlay.classList.add('hidden');
+    if (e.message.startsWith('AUTH:')) {
+      setSyncStatus('err', '');
+      showToast('API key invalid or expired. Click the sync button to enter a new key.', 'red');
+      clearKey();
+    } else if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('CORS')) {
+      setSyncStatus('err', '');
+      showToast('Network blocked — try again with an API key (works outside Claude.ai too).', 'amb');
+    } else if (e.message.startsWith('PARSE:')) {
+      setSyncStatus('err', '');
+      showToast('Response received but could not be parsed. Rates unchanged.', 'amb');
+    } else {
+      setSyncStatus('err', '');
+      showToast(`Sync failed: ${e.message}`, 'amb');
+    }
+  }
 }
 
-function setSyncStatus(state, txt) {
-  const dot = document.getElementById('syncDot');
-  const label = document.getElementById('syncTxt');
-  dot.className = 'sync-dot ' + state;
-  label.innerHTML = state === 'live'
-    ? `<strong style="color:var(--acc)">Live</strong> <span>· ${txt.replace('Live · ', '')}</span>`
-    : state === 'syncing'
-    ? `<strong>Fetching rates…</strong>`
-    : `<span style="color:var(--amb)">${txt}</span>`;
+// ─── TOAST ───
+function showToast(msg, type = 'amb') {
+  let t = document.getElementById('llToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'llToast';
+    t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);max-width:500px;width:calc(100% - 40px);padding:11px 18px;border-radius:10px;font-size:12px;z-index:600;line-height:1.5;text-align:center;transition:opacity .4s;pointer-events:none;`;
+    document.body.appendChild(t);
+  }
+  const c = { acc:['rgba(23,217,160,0.13)','rgba(23,217,160,0.35)','#17D9A0'], amb:['rgba(245,158,11,0.13)','rgba(245,158,11,0.35)','#F59E0B'], red:['rgba(255,96,96,0.13)','rgba(255,96,96,0.35)','#FF6060'] }[type] || [];
+  t.style.cssText += `background:${c[0]};border:1px solid ${c[1]};color:${c[2]};display:block;opacity:1;`;
+  t.textContent = msg;
+  clearTimeout(t._tid);
+  t._tid = setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.style.display = 'none', 400); }, 6000);
 }
 
 // ═══════════════════════════════════════
@@ -1202,11 +1304,21 @@ function fmtL(n) { return '₹' + (n / 1e5).toFixed(1) + 'L'; }
 // INIT
 // ═══════════════════════════════════════
 function init() {
+  // Try loading cached data first
+  const cached = loadFromCache();
+  if (cached && cached.banks) {
+    liveData = cached.banks;
+    const ago = Math.round((Date.now() - cached.savedAt) / 3600000);
+    const agoLabel = ago < 1 ? 'just now' : ago < 24 ? `${ago}h ago` : `${Math.round(ago/24)}d ago`;
+    setSyncStatus('cached', `${cached.ts} · ${agoLabel}`);
+    showToast(`Using cached rates from ${cached.ts}. Click sync to refresh.`, 'amb');
+  } else {
+    setSyncStatus('fallback', '');
+  }
   buildBankStrip();
   applyBankDefaults();
   recalc();
-  // Auto-fetch on load
-  setTimeout(fetchLiveRates, 800);
+  // Never auto-fetch — user controls when to use API credits
 }
 
 init();
